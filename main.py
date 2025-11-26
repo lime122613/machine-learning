@@ -340,7 +340,27 @@ def run_training_and_evaluation(
 
     X = data[feature_cols]
     y = data[target_col]
-
+    
+    # 분류 문제인데 타깃이 연속적인 수치형이면 오류가 나므로, 미리 막아주기
+    if problem_type == "classification":
+        if np.issubdtype(y.dtype, np.floating):
+            # 값 종류가 적고, 정수처럼 생겼으면 정수 라벨로 변환해서 사용
+            unique_vals = np.sort(y.unique())
+            if np.allclose(unique_vals, unique_vals.astype(int)) and len(unique_vals) <= 20:
+                y = y.astype(int)
+                st.info(
+                    "타깃 값이 숫자(float)지만 값의 종류가 적고 정수처럼 보여 "
+                    "**범주형 라벨(정수)** 로 자동 변환하여 분류 문제로 학습합니다."
+                )
+            else:
+                st.error(
+                    "현재 선택한 타깃 변수는 **연속적인 수치형 데이터**로 보입니다.\n\n"
+                    "- 분류(Random Forest, 로지스틱 회귀 등)는 이런 타깃에 사용할 수 없습니다.\n"
+                    "- 👉 사이드바에서 문제 유형을 **'회귀'**로 바꾸거나,\n"
+                    "  또는 **범주형(클래스)** 타깃 열을 선택해주세요."
+                )
+                return
+   
     # 범주형(문자형) 특징을 원-핫 인코딩
     X_encoded = pd.get_dummies(X, drop_first=True)
 
