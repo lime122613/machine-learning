@@ -344,25 +344,89 @@ def show_classification_results(y_test, y_pred):
     """분류 모델 평가 결과 출력"""
     st.subheader("4️⃣ 분류 모델 평가 결과 🔍")
 
+    # 1) 정확도
     acc = accuracy_score(y_test, y_pred)
     st.metric("정확도 (accuracy)", f"{acc:.3f}")
     st.caption("정확도는 전체 예측 중에서 **맞춘 비율**을 의미합니다.")
 
-    # 혼동행렬
+    # 2) 혼동 행렬
     cm = confusion_matrix(y_test, y_pred)
     labels = sorted(list(set(y_test) | set(y_pred)))
+    labels_str = [str(l) for l in labels]   # 문자열 라벨
 
     st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
     fig_cm = px.imshow(
         cm,
-        x=labels,
-        y=labels,
+        x=labels_str,
+        y=labels_str,
         text_auto=True,
-        labels=dict(x="예측 값", y="실제 값", color="개수"),
+        color_continuous_scale="Blues",
+        aspect="equal",
     )
-    fig_cm.update_layout(width=500, height=500)
+    fig_cm.update_layout(
+        xaxis_title="예측 값",
+        yaxis_title="실제 값",
+        xaxis=dict(type="category"),
+        yaxis=dict(type="category"),
+    )
     st.plotly_chart(fig_cm, use_container_width=True)
 
+    # 💬 혼동행렬 + 예측 분포 설명
+    st.info(
+        "• **혼동행렬**은 `정답(실제 값)`과 `예측`을 짝지어서 **얼마나 맞았는지/틀렸는지**를 보여줍니다.\n"
+        "• 아래의 **분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 보여줍니다.\n"
+        "두 그래프를 함께 보면\n"
+        "  - 단순히 **맞춘 비율(정확도)**뿐 아니라,\n"
+        "  - **특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다."
+    )
+
+    # 3) 실제 분포 vs 예측 분포 비교
+    st.markdown("#### 📊 실제 분포 vs 예측 분포 (비율 비교)")
+
+    # 실제/예측 라벨 빈도
+    actual_counts = pd.Series(y_test).value_counts()
+    pred_counts = pd.Series(y_pred).value_counts()
+
+    all_labels = sorted(set(actual_counts.index) | set(pred_counts.index))
+    actual_counts = actual_counts.reindex(all_labels, fill_value=0)
+    pred_counts = pred_counts.reindex(all_labels, fill_value=0)
+
+    actual_ratio = actual_counts / actual_counts.sum()
+    pred_ratio = pred_counts / pred_counts.sum()
+
+    dist_df = pd.DataFrame({
+        "클래스": [str(l) for l in all_labels] * 2,
+        "비율": np.concatenate([actual_ratio.values, pred_ratio.values]),
+        "데이터": ["실제"] * len(all_labels) + ["예측"] * len(all_labels),
+    })
+
+    fig_compare = px.bar(
+        dist_df,
+        x="클래스",
+        y="비율",
+        color="데이터",
+        barmode="group",
+        text_auto=".2f",
+    )
+    fig_compare.update_layout(
+        yaxis=dict(range=[0, 1]),
+        yaxis_title="비율",
+    )
+    st.plotly_chart(fig_compare, use_container_width=True)
+
+    st.caption(
+        "막대그래프에서 **실제 분포**와 **예측 분포**의 모양이 비슷할수록, "
+        "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
+    )
+
+    # 4) (선택) 예측 결과 분포 히스토그램 그대로 유지
+    st.markdown("#### 📊 예측 결과 분포 (개수 기준)")
+    pred_df = pd.DataFrame({"예측 값": y_pred})
+    fig_hist = px.histogram(pred_df, x="예측 값")
+    fig_hist.update_layout(xaxis_title="클래스", yaxis_title="개수")
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+    # 5) 정밀도/재현율/F1-score
     with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
         report_text = classification_report(y_test, y_pred)
         st.text(report_text)
@@ -372,12 +436,6 @@ def show_classification_results(y_test, y_pred):
             "- F1-score: 정밀도와 재현율의 조화평균(둘 다 균형 있게 잘 나오는지)"
         )
 
-    # 예측 결과 분포
-    st.markdown("#### 📊 예측 결과 분포")
-    pred_df = pd.DataFrame({"예측 값": y_pred})
-    fig_hist = px.histogram(pred_df, x="예측 값")
-    fig_hist.update_layout(xaxis_title="클래스", yaxis_title="개수")
-    st.plotly_chart(fig_hist, use_container_width=True)
 
 
 def show_regression_results(y_test, y_pred):
