@@ -3,7 +3,7 @@
 # 지도학습 실습용 Streamlit 웹 앱
 # - CSV 업로드 → 특징/타깃 선택 → 상관관계 히트맵 → 분류/회귀 선택 → 모델 학습/평가
 # ---------------------------------------------
-
+from pandas.errors import EmptyDataError
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -40,13 +40,31 @@ st.set_page_config(
 # 0. 유틸 함수들
 # ---------------------------------------------
 def load_data(uploaded_file):
-    """CSV 파일을 읽어 DataFrame으로 반환하는 함수"""
+    """CSV 파일을 읽어 DataFrame으로 반환하는 함수 (인코딩/빈 파일 예외 처리 포함)"""
+    if uploaded_file is None:
+        return None
+
     try:
+        # 첫 번째 시도 전에 항상 파일 포인터를 처음으로 돌려놓기
+        uploaded_file.seek(0)
         df = pd.read_csv(uploaded_file)
+        return df
+
     except UnicodeDecodeError:
-        # 한글 윈도우에서 저장된 CSV를 대비한 예외 처리
+        # 인코딩 문제로 실패했으면 cp949로 다시 시도
+        uploaded_file.seek(0)
         df = pd.read_csv(uploaded_file, encoding="cp949")
-    return df
+        return df
+
+    except EmptyDataError:
+        # 파일이 비어있을 때
+        st.error("CSV 파일에 **데이터가 없습니다.** 내용이 있는 CSV 파일을 업로드해 주세요.")
+        return None
+
+    except Exception as e:
+        # 그 외 예외는 메시지만 보여주고 None 반환
+        st.error(f"CSV를 읽는 중 문제가 발생했습니다: {e}")
+        return None
 
 
 def show_data_overview(df):
@@ -524,6 +542,10 @@ def main():
 
     # 데이터 로드
     df = load_data(uploaded_file)
+    
+    if df is None or df.empty:
+        st.error("CSV 파일을 읽을 수 없거나, 데이터가 비어 있습니다. 다른 파일을 업로드해 주세요.")
+        st.stop()
 
     # 데이터 미리보기 및 요약
     show_data_overview(df)
