@@ -371,16 +371,27 @@ def show_classification_results(y_test, y_pred):
     )
     st.plotly_chart(fig_cm, use_container_width=True)
 
-    # 💬 혼동행렬 + 예측 분포 설명
+    # 3) 클래스별 정밀도/재현율/F1-score (혼동행렬 바로 아래)
+    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
+        report_text = classification_report(y_test, y_pred)
+        st.text(report_text)
+        st.caption(
+            "- 정밀도(precision): 맞다고 예측한 것 중에서 실제로 맞은 비율\n"
+            "- 재현율(recall): 실제로 맞는 것 중에서 모델이 맞다고 찾아낸 비율\n"
+            "- F1-score: 정밀도와 재현율의 조화평균(둘 다 균형 있게 잘 나오는지)"
+        )
+
+    # 4) 혼동행렬 + 분포 그래프에 대한 설명
     st.info(
         "• **혼동행렬**은 `정답(실제 값)`과 `예측`을 짝지어서 **얼마나 맞았는지/틀렸는지**를 보여줍니다.\n"
-        "• 아래의 **분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 보여줍니다.\n"
-        "두 그래프를 함께 보면\n"
-        "  - 단순히 **맞춘 비율(정확도)**뿐 아니라,\n"
-        "  - **특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다."
+        "• 아래의 **실제 분포 vs 예측 분포 그래프**는 모델이 각 클래스를 "
+        "**얼마나 자주 선택했는지**를 실제 데이터와 비교해서 보여줍니다.\n"
+        
+        "두 정보를 함께 보면\n"
+        "  - 단순히 **맞춘 비율(정확도)**뿐 아니라, 특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다."
     )
 
-    # 3) 실제 분포 vs 예측 분포 비교
+    # 5) 실제 분포 vs 예측 분포 (비율 비교)
     st.markdown("#### 📊 실제 분포 vs 예측 분포 (비율 비교)")
 
     # 실제/예측 라벨 빈도
@@ -418,23 +429,6 @@ def show_classification_results(y_test, y_pred):
         "막대그래프에서 **실제 분포**와 **예측 분포**의 모양이 비슷할수록, "
         "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
     )
-
-    # 4) (선택) 예측 결과 분포 히스토그램 그대로 유지
-    st.markdown("#### 📊 예측 결과 분포 (개수 기준)")
-    pred_df = pd.DataFrame({"예측 값": y_pred})
-    fig_hist = px.histogram(pred_df, x="예측 값")
-    fig_hist.update_layout(xaxis_title="클래스", yaxis_title="개수")
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-    # 5) 정밀도/재현율/F1-score
-    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
-        report_text = classification_report(y_test, y_pred)
-        st.text(report_text)
-        st.caption(
-            "- 정밀도(precision): 맞다고 예측한 것 중에서 실제로 맞은 비율\n"
-            "- 재현율(recall): 실제로 맞는 것 중에서 모델이 맞다고 찾아낸 비율\n"
-            "- F1-score: 정밀도와 재현율의 조화평균(둘 다 균형 있게 잘 나오는지)"
-        )
 
 
 
