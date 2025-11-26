@@ -1,7 +1,7 @@
 # app.py
 # ---------------------------------------------
 # 지도학습 실습용 Streamlit 웹 앱
-# - CSV 업로드 → 특징/타깃 선택 → 분류/회귀 선택 → 모델 학습/평가
+# - CSV 업로드 → 특징/타깃 선택 → 상관관계 히트맵 → 분류/회귀 선택 → 모델 학습/평가
 # ---------------------------------------------
 
 import streamlit as st
@@ -24,6 +24,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 import plotly.express as px
+
 
 # ---------------------------------------------
 # 기본 설정
@@ -67,8 +68,80 @@ def show_data_overview(df):
         st.write(df.isna().sum())
 
 
+def show_correlation_heatmap(df):
+    """수치형 변수들 간의 상관관계 히트맵"""
+    st.subheader("2️⃣ 수치형 변수 간 상관관계 히트맵")
+
+    numeric_df = df.select_dtypes(include=[np.number])
+
+    if numeric_df.shape[1] < 2:
+        st.info("수치형 열이 2개 이상 있어야 상관관계 히트맵을 그릴 수 있습니다.")
+        return
+
+    corr = numeric_df.corr()
+
+    fig = px.imshow(
+        corr,
+        text_auto=True,
+        color_continuous_scale="RdBu",
+        zmin=-1,
+        zmax=1,
+        aspect="auto",
+        labels=dict(color="상관계수"),
+    )
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.caption(
+        "상관계수는 -1에서 1 사이의 값이며, 절댓값이 1에 가까울수록 두 변수의 선형 관계가 강합니다.\n"
+        "단, **상관관계가 곧 인과관계(원인-결과)를 의미하는 것은 아닙니다.**"
+    )
+
+
+def show_target_correlations(df, target_col):
+    """타깃 변수와 다른 수치형 변수들의 상관관계 표"""
+    st.subheader("3️⃣ 타깃 변수와의 상관관계")
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+
+    if target_col not in numeric_cols:
+        st.info(
+            "타깃 변수가 수치형이 아니어서 상관계수를 계산할 수 없습니다. "
+            "분류 문제에서는 주로 범주형(문자형) 타깃을 사용합니다."
+        )
+        return
+
+    corr_with_target = df[numeric_cols].corr()[target_col].drop(target_col)
+
+    # 절댓값 기준으로 내림차순 정렬
+    corr_sorted = corr_with_target.reindex(
+        corr_with_target.abs().sort_values(ascending=False).index
+    )
+
+    st.markdown("#### 🎯 타깃과 수치형 변수들의 상관계수")
+    st.dataframe(
+        corr_sorted.to_frame("상관계수"),
+        use_container_width=True,
+    )
+
+    # 상관계수 절댓값이 0.5 이상인 변수만 한 번 더 강조
+    strong_corr = corr_sorted[ corr_sorted.abs() >= 0.5 ]
+    if not strong_corr.empty:
+        st.markdown("##### ⭐ 상관계수 절댓값이 0.5 이상인 변수들 (강한 상관관계)")
+        st.write(strong_corr.to_frame("상관계수"))
+    else:
+        st.info("절댓값 0.5 이상으로 강한 상관관계를 보이는 수치형 변수는 없습니다.")
+
+    st.caption(
+        "상관계수의 절댓값이 0.5 이상이면 비교적 강한 선형 관계가 있다고 볼 수 있습니다.\n"
+        "이 정보를 활용해 **타깃과 관련이 높아 보이는 특징 열을 선택해 볼 수 있습니다.**"
+    )
+
+
 def choose_features_and_target(df):
-    """사이드바에서 독립변수(특징)와 타깃(정답) 변수 선택"""
+    """사이드바에서 독립변수(특징)와 타깃(정답) 변수 선택
+       + 타깃과 상관관계가 높은 열들을 기본 선택으로 추천
+    """
     st.sidebar.subheader("2️⃣ 입력/타깃 변수 선택")
 
     all_cols = df.columns.tolist()
@@ -78,9 +151,30 @@ def choose_features_and_target(df):
         options=["(선택 안 함)"] + all_cols,
     )
 
-    # 기본값: 숫자형 열들을 자동으로 특징으로 선택
+    if target_col == "(선택 안 함)":
+        target_col = None
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    default_features = [c for c in numeric_cols if c != target_col]
+
+    # 기본 특징 선택: 타깃과 상관관계가 높은 상위 5개의 수치형 열
+    default_features = []
+    if target_col is not None and target_col in numeric_cols and len(numeric_cols) > 1:
+        corr = df[numeric_cols].corr()[target_col].drop(target_col)
+        top_features = (
+            corr.abs()
+            .sort_values(ascending=False)
+            .head(5)
+            .index
+            .tolist()
+        )
+        default_features = top_features
+        st.sidebar.caption(
+            "※ 타깃과 상관계수가 높은 수치형 열 기준으로 상위 5개를 기본 선택했습니다.\n"
+            "   (언제든지 아래에서 직접 수정할 수 있습니다.)"
+        )
+    else:
+        # 타깃이 수치형이 아니거나, 상관관계 계산이 어려운 경우 → 수치형 열 전체 추천
+        default_features = [c for c in numeric_cols if c != target_col]
 
     feature_cols = st.sidebar.multiselect(
         "입력(특징) 변수 선택 (여러 개 선택 가능)",
@@ -88,10 +182,7 @@ def choose_features_and_target(df):
         default=default_features,
     )
 
-    if target_col == "(선택 안 함)":
-        target_col = None
-
-    # 타깃 변수가 특징에 포함되어 있으면 제거
+    # 타깃이 특징에 섞여 있으면 제거
     if target_col and target_col in feature_cols:
         st.sidebar.warning("타깃 변수는 독립변수에서 자동으로 제외됩니다.")
         feature_cols = [c for c in feature_cols if c != target_col]
@@ -233,7 +324,7 @@ def build_model(problem_type: str, algo: str, params: dict):
 
 def show_classification_results(y_test, y_pred):
     """분류 모델 평가 결과 출력"""
-    st.subheader("3️⃣ 분류 모델 평가 결과 🔍")
+    st.subheader("4️⃣ 분류 모델 평가 결과 🔍")
 
     acc = accuracy_score(y_test, y_pred)
     st.metric("정확도 (accuracy)", f"{acc:.3f}")
@@ -273,7 +364,7 @@ def show_classification_results(y_test, y_pred):
 
 def show_regression_results(y_test, y_pred):
     """회귀 모델 평가 결과 출력"""
-    st.subheader("3️⃣ 회귀 모델 평가 결과 🔍")
+    st.subheader("4️⃣ 회귀 모델 평가 결과 🔍")
 
     mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
@@ -318,7 +409,7 @@ def run_training_and_evaluation(
     df, feature_cols, target_col, problem_type, algo, params, test_size
 ):
     """전체 학습/평가 파이프라인 실행"""
-    st.subheader("2️⃣ 학습 및 평가 설정 결과")
+    st.subheader("4️⃣ 학습 및 평가 결과")
 
     data = df[feature_cols + [target_col]].copy()
 
@@ -340,13 +431,16 @@ def run_training_and_evaluation(
 
     X = data[feature_cols]
     y = data[target_col]
-    
-    # 분류 문제인데 타깃이 연속적인 수치형이면 오류가 나므로, 미리 막아주기
+
+    # 🔹 분류 문제인데 타깃이 연속적인 수치형이면 미리 체크 🔹
     if problem_type == "classification":
         if np.issubdtype(y.dtype, np.floating):
-            # 값 종류가 적고, 정수처럼 생겼으면 정수 라벨로 변환해서 사용
             unique_vals = np.sort(y.unique())
-            if np.allclose(unique_vals, unique_vals.astype(int)) and len(unique_vals) <= 20:
+            # 값들이 정수처럼 보이고, 종류가 많지 않으면 정수 라벨로 변환
+            if (
+                np.allclose(unique_vals, unique_vals.astype(int))
+                and len(unique_vals) <= 20
+            ):
                 y = y.astype(int)
                 st.info(
                     "타깃 값이 숫자(float)지만 값의 종류가 적고 정수처럼 보여 "
@@ -360,7 +454,7 @@ def run_training_and_evaluation(
                     "  또는 **범주형(클래스)** 타깃 열을 선택해주세요."
                 )
                 return
-   
+
     # 범주형(문자형) 특징을 원-핫 인코딩
     X_encoded = pd.get_dummies(X, drop_first=True)
 
@@ -404,7 +498,7 @@ def main():
     st.title("📘 지도학습 실습 웹 앱")
     st.write(
         """
-        이 앱은 **CSV 데이터를 업로드 → 특징/타깃 선택 → 분류/회귀 알고리즘 선택 → 모델 학습/평가**까지  
+        이 앱은 **CSV 데이터를 업로드 → 특징/타깃 선택 → 상관관계 탐색 → 분류/회귀 알고리즘 선택 → 모델 학습/평가**까지  
         지도학습(supervised learning)의 전체 흐름을 직접 체험해볼 수 있도록 만든 교육용 도구입니다.
         """
     )
@@ -434,6 +528,9 @@ def main():
     # 데이터 미리보기 및 요약
     show_data_overview(df)
 
+    # 수치형 변수 간 상관관계 히트맵
+    show_correlation_heatmap(df)
+
     # -----------------------------------------
     # 2. 특징/타깃 선택
     # -----------------------------------------
@@ -446,6 +543,9 @@ def main():
     if not feature_cols:
         st.warning("최소 1개의 입력(특징) 변수를 선택해주세요.")
         st.stop()
+
+    # 타깃과의 상관관계 표 (수치형 타깃일 때)
+    show_target_correlations(df, target_col)
 
     # -----------------------------------------
     # 3. 문제 유형 자동/수동 설정
