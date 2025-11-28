@@ -16,7 +16,11 @@ from sklearn.metrics import (
     mean_squared_error,
     mean_absolute_error,
     r2_score,
+    precision_score,
+    recall_score,
+    f1_score,
 )
+
 
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -396,92 +400,43 @@ def show_classification_results(y_test, y_pred):
     """분류 모델 평가 결과 출력"""
     st.subheader("4️⃣ 분류 모델 평가 결과 🔍")
 
-    # 1) 정확도
-    acc = accuracy_score(y_test, y_pred)
-    st.metric("정확도 (accuracy)", f"{acc:.3f}")
-    st.caption("정확도는 전체 예측 중에서 **맞춘 비율**을 의미합니다.")
-
-    # 2) 혼동 행렬
-    cm = confusion_matrix(y_test, y_pred)
+    # 라벨 정보
     labels = sorted(list(set(y_test) | set(y_pred)))
-    labels_str = [str(l) for l in labels]   # 문자열 라벨
 
-    st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
-    fig_cm = px.imshow(
-        cm,
-        x=labels_str,
-        y=labels_str,
-        text_auto=True,
-        color_continuous_scale="Blues",
-        aspect="equal",
-    )
-    fig_cm.update_layout(
-        xaxis_title="예측 값",
-        yaxis_title="실제 값",
-        xaxis=dict(type="category"),
-        yaxis=dict(type="category"),
-    )
-    st.plotly_chart(fig_cm, use_container_width=True)
+    # 🔹 정확도
+    acc = accuracy_score(y_test, y_pred)
 
-    # 3) 클래스별 정밀도/재현율/F1-score (혼동행렬 바로 아래)
-    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
-        report_text = classification_report(y_test, y_pred)
-        st.text(report_text)
-        st.caption(
-            "- 정밀도(precision): 맞다고 예측한 것 중에서 실제로 맞은 비율\n"
-            "- 재현율(recall): 실제로 맞는 것 중에서 모델이 맞다고 찾아낸 비율\n"
-            "- F1-score: 정밀도와 재현율의 조화평균(둘 다 균형 있게 잘 나오는지)"
-        )
+    # 🔹 이진 분류(예: 0/1)일 때는 "양성 클래스" 기준으로 precision/recall/F1 계산
+    if len(labels) == 2:
+        # 보통 1이 양성 클래스지만, 데이터에 따라 없을 수도 있어서 처리
+        pos_label = 1 if 1 in labels else labels[-1]
+        prec = precision_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
+        rec = recall_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
+        f1 = f1_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
+        metric_subtitle = f"(양성 클래스: {pos_label})"
+    else:
+        # 다중 분류일 때는 macro 평균으로 표시
+        prec = precision_score(y_test, y_pred, average="macro", zero_division=0)
+        rec = recall_score(y_test, y_pred, average="macro", zero_division=0)
+        f1 = f1_score(y_test, y_pred, average="macro", zero_division=0)
+        metric_subtitle = "(macro 평균)"
 
-    # 4) 혼동행렬 + 분포 그래프에 대한 설명
-    st.markdown(
-        """
-#### **혼동행렬 & 분포 그래프 해석**
-
-- **혼동행렬**은 `정답(실제 값)`과 `예측`을 짝지어서 **얼마나 맞았는지/틀렸는지**를 보여줍니다.  
-- **실제 분포 vs 예측 분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 실제 데이터와 비교해서 보여줍니다.  
-
-두 정보를 함께 보면  단순히 맞춘 비율(정확도)뿐 아니라,  특정 답만 너무 많이 고르는 건 아닌지(편향) 도 함께 살펴볼 수 있습니다.
-        """
-    )
-
-
-    # 실제/예측 라벨 빈도
-    actual_counts = pd.Series(y_test).value_counts()
-    pred_counts = pd.Series(y_pred).value_counts()
-
-    all_labels = sorted(set(actual_counts.index) | set(pred_counts.index))
-    actual_counts = actual_counts.reindex(all_labels, fill_value=0)
-    pred_counts = pred_counts.reindex(all_labels, fill_value=0)
-
-    actual_ratio = actual_counts / actual_counts.sum()
-    pred_ratio = pred_counts / pred_counts.sum()
-
-    dist_df = pd.DataFrame({
-        "클래스": [str(l) for l in all_labels] * 2,
-        "비율": np.concatenate([actual_ratio.values, pred_ratio.values]),
-        "데이터": ["실제"] * len(all_labels) + ["예측"] * len(all_labels),
-    })
-
-    fig_compare = px.bar(
-        dist_df,
-        x="클래스",
-        y="비율",
-        color="데이터",
-        barmode="group",
-        text_auto=".2f",
-    )
-    fig_compare.update_layout(
-        yaxis=dict(range=[0, 1]),
-        yaxis_title="비율",
-    )
-    st.plotly_chart(fig_compare, use_container_width=True)
+    # 🔹 한 줄에 Accuracy / Precision / Recall / F1 한 번에 보여주기
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("정확도 (accuracy)", f"{acc:.3f}")
+    c2.metric(f"정밀도 (precision) {metric_subtitle}", f"{prec:.3f}")
+    c3.metric(f"재현율 (recall) {metric_subtitle}", f"{rec:.3f}")
+    c4.metric(f"F1-score {metric_subtitle}", f"{f1:.3f}")
 
     st.caption(
-        "막대그래프에서 **실제 분포**와 **예측 분포**의 모양이 비슷할수록, "
-        "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
+        "- **정확도(accuracy)**: 전체 예측 중에서 맞춘 비율\n"
+        "- **정밀도(precision)**: '맞다고 예측한 것' 중에서 실제로 맞은 비율\n"
+        "- **재현율(recall)**: '실제로 맞는 것' 중에서 모델이 맞다고 찾아낸 비율\n"
+        "- **F1-score**: 정밀도와 재현율의 조화평균 (둘 다 균형 있게 좋은지)"
     )
 
+    # 🔻 여기서부터는 기존 혼동행렬 / 분포 그래프 / classification_report 부분 이어서 사용
+    # 예: cm = confusion_matrix(...), fig_cm = px.imshow(...), ...
 
 
 def show_regression_results(y_test, y_pred):
