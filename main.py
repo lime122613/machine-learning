@@ -398,7 +398,9 @@ def build_model(problem_type: str, algo: str, params: dict):
 
 def show_classification_results(y_test, y_pred):
     """분류 모델 평가 결과 출력"""
-    st.subheader("4️⃣ 분류 모델 평가 결과 🔍")
+    st.subheader("5️⃣ 분류 모델 평가 결과 🔍")
+    ...
+
 
     # --- 1) 라벨 및 리포트 계산 (여기 결과를 위/아래에서 공통 사용) ---
     labels = sorted(list(set(y_test) | set(y_pred)))
@@ -438,7 +440,8 @@ def show_classification_results(y_test, y_pred):
         "- **F1-score**: 정밀도와 재현율의 조화평균 (둘 다 균형 있게 좋은지)"
     )
 
-    # --- 3) 혼동행렬 그림 (여기서부터는 그대로 아래로 쭉 나옴) ---
+    # --- 3) 혼동행렬 그림 ---
+    st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
     cm = confusion_matrix(y_test, y_pred)
     label_strs = [str(l) for l in labels]
 
@@ -522,7 +525,7 @@ def show_classification_results(y_test, y_pred):
 
 def show_regression_results(y_test, y_pred):
     """회귀 모델 평가 결과 출력"""
-    st.subheader("4️⃣ 회귀 모델 평가 결과 🔍")
+    st.subheader("5️⃣ 회귀 모델 평가 결과 🔍")
 
     mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
@@ -567,7 +570,7 @@ def run_training_and_evaluation(
     df, feature_cols, target_col, problem_type, algo, params, test_size
 ):
     """전체 학습/평가 파이프라인 실행"""
-    st.subheader("4️⃣ 학습 및 평가 결과")
+    st.subheader("4️⃣ 학습 및 데이터 분할")
 
     data = df[feature_cols + [target_col]].copy()
 
