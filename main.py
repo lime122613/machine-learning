@@ -432,7 +432,15 @@ def show_classification_results(y_test, y_pred):
     c2.metric(f"정밀도 (precision) {metric_note}", f"{prec:.3f}")
     c3.metric(f"재현율 (recall) {metric_note}", f"{rec:.3f}")
     c4.metric(f"F1-score {metric_note}", f"{f1:.3f}")
-
+    
+   # --- 6) classification_report 텍스트 버전 (expander로) ---
+    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
+        st.text(classification_report(y_test, y_pred, zero_division=0))
+        st.caption(
+            "- 위 요약 메트릭은 이 리포트의 값과 동일하게 계산되었습니다.\n"
+            "- 특히 **소수 클래스(예: 1)**의 재현율과 정밀도를 잘 살펴보세요."
+        )
+        
     st.caption(
         "- **정확도(accuracy)**: 전체 예측 중에서 맞춘 비율\n"
         "- **정밀도(precision)**: '맞다고 예측한 것' 중에서 실제로 맞은 비율\n"
@@ -441,10 +449,6 @@ def show_classification_results(y_test, y_pred):
     )
 
     # --- 3) 혼동행렬 그림 ---
-    st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
-    cm = confusion_matrix(y_test, y_pred)
-    label_strs = [str(l) for l in labels]
-
     st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
     fig_cm = px.imshow(
         cm,
@@ -471,8 +475,7 @@ def show_classification_results(y_test, y_pred):
 - **실제 분포 vs 예측 분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 실제 데이터와 비교해서 보여줍니다.  
 
 두 정보를 함께 보면  
-- 단순히 **맞춘 비율(정확도)**뿐 아니라,  
-- **특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다.
+- 단순히 맞춘 비율(정확도)뿐 아니라,  특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다.
         """
     )
 
@@ -514,13 +517,6 @@ def show_classification_results(y_test, y_pred):
         "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
     )
 
-    # --- 6) 원래 보던 classification_report 텍스트 버전 (expander로) ---
-    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
-        st.text(classification_report(y_test, y_pred, zero_division=0))
-        st.caption(
-            "- 위 요약 메트릭은 이 리포트의 값과 동일하게 계산되었습니다.\n"
-            "- 특히 **소수 클래스(예: 1)**의 재현율과 정밀도를 잘 살펴보세요."
-        )
 
 
 def show_regression_results(y_test, y_pred):
