@@ -439,6 +439,20 @@ def show_classification_results(y_test, y_pred):
         "- **F1-score**: 정밀도와 재현율의 조화평균 (둘 다 균형 있게 좋은지)"
     )
 
+    # 🔹 2-1) 여기서 바로 클래스별 상세 지표(expander) 보여주기
+with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
+    st.text(classification_report(y_test, y_pred, zero_division=0))
+    st.caption(
+        "- **소수 클래스**는 데이터에서 개수는 적지만, 놓치면 안 되는 경우가 많습니다. "
+        "(예: 질병 있음, 이상 징후, 부정 거래 등)\n"
+        "- 재현율(recall)이 낮으면 **실제로 1인 사람을 많이 놓치고 있다**는 뜻이고,\n"
+        "  정밀도(precision)가 낮으면 **사실은 0인 사람을 1이라고 잘못 분류하고 있다**는 뜻입니다.\n"
+        "- 의료·안전처럼 '놓치면 안 되는 경우'에는 **재현율**을 더 중요하게 보고,\n"
+        "  광고·스팸처럼 '괜히 1이라고 하면 불편한 경우'에는 **정밀도**를 더 중요하게 봅니다.\n"
+        "- **F1-score**는 정밀도와 재현율을 함께 고려해, 두 값이 얼마나 **균형 있게** 좋은지를 보여주는 지표입니다."
+    )
+
+
     # --- 3) 혼동행렬 그림 ---
     st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
 
@@ -470,8 +484,7 @@ def show_classification_results(y_test, y_pred):
 - **실제 분포 vs 예측 분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 실제 데이터와 비교해서 보여줍니다.  
 
 두 정보를 함께 보면  
-- 단순히 **맞춘 비율(정확도)**뿐 아니라,  
-- **특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다.
+- 단순히 맞춘 비율(정확도)뿐 아니라,  특정 답만 너무 많이 고르는 건 아닌지(편향)도 함께 살펴볼 수 있습니다.
         """
     )
 
@@ -512,14 +525,6 @@ def show_classification_results(y_test, y_pred):
         "막대그래프에서 **실제 분포**와 **예측 분포**의 모양이 비슷할수록, "
         "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
     )
-
-    # --- 6) classification_report 텍스트 버전 (expander로) ---
-    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
-        st.text(classification_report(y_test, y_pred, zero_division=0))
-        st.caption(
-            "- 위 요약 메트릭은 이 리포트의 값과 동일하게 계산되었습니다.\n"
-            "- 특히 **소수 클래스(예: 1)**의 재현율과 정밀도를 잘 살펴보세요."
-        )
 
 
 def show_regression_results(y_test, y_pred):
