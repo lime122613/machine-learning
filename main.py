@@ -117,42 +117,94 @@ def show_correlation_heatmap(df):
 
 
 def show_target_correlations(df, target_col):
-    """타깃 변수와 다른 수치형 변수들의 상관관계 표"""
-    st.subheader("3️⃣ 타깃 변수와의 상관관계")
+    """
+    타깃 변수와 다른 변수들의 관련성을 보여주는 함수.
+    - 수치형 특징: 피어슨 상관계수
+    - 범주형 특징(object, category): 원-핫 인코딩 후, 타깃과 가장 관련이 큰 더미의 상관계수를 대표값으로 사용
+    """
+    st.subheader("3️⃣ 타깃 변수와의 관련도 (수치형 + 범주형)")
 
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-
-    if target_col not in numeric_cols:
-        st.info(
-            "타깃 변수가 수치형이 아니어서 상관계수를 계산할 수 없습니다. "
-            "분류 문제에서는 주로 범주형(문자형) 타깃을 사용합니다."
-        )
+    if target_col is None:
+        st.info("타깃 변수를 선택하면, 타깃과 다른 변수들의 관련도를 보여줍니다.")
         return
 
-    corr_with_target = df[numeric_cols].corr()[target_col].drop(target_col)
+    y = df[target_col]
 
-    # 절댓값 기준으로 내림차순 정렬
-    corr_sorted = corr_with_target.reindex(
-        corr_with_target.abs().sort_values(ascending=False).index
-    )
+    # 타깃이 수치형/이진(0/1)이어야 상관계수 기반으로 보기 쉬움
+    if not np.issubdtype(y.dtype, np.number):
+        try:
+            y = pd.to_numeric(y)
+            st.info(
+                "타깃 변수가 문자형이어서 숫자로 변환하여 관련도를 계산했습니다. "
+                "클래스가 0/1처럼 이진일 때 해석이 더 자연스럽습니다."
+            )
+        except Exception:
+            st.info(
+                "현재 타깃 변수가 문자형이고 숫자로 변환하기 어려워, "
+                "상관계수 기반 관련도는 계산하지 않습니다."
+            )
+            return
 
-    st.markdown("#### 🎯 타깃과 수치형 변수들의 상관계수")
+    results = []
+    for col in df.columns:
+        if col == target_col:
+            continue
+
+        s = df[col]
+
+        # 모두 결측이면 건너뛰기
+        if s.isna().all():
+            continue
+
+        try:
+            if np.issubdtype(s.dtype, np.number):
+                # 수치형: 그대로 상관계수
+                corr = s.corr(y)
+                var_type = "수치형"
+            else:
+                # 범주형: 원-핫 인코딩 후, 타깃과 상관계수가 가장 큰 더미를 대표값으로 사용
+                dummies = pd.get_dummies(s, prefix=col, drop_first=True)
+                if dummies.shape[1] == 0:
+                    continue
+                corrs = dummies.apply(lambda x: x.corr(y))
+                # NaN 제거
+                corrs = corrs.dropna()
+                if corrs.empty:
+                    continue
+                best_dummy = corrs.abs().idxmax()
+                corr = corrs[best_dummy]
+                var_type = "범주형"
+            results.append(
+                {
+                    "변수": col,
+                    "유형": var_type,
+                    "상관계수": corr,
+                    "절댓값": abs(corr),
+                }
+            )
+        except Exception:
+            # 문제 생기는 열은 조용히 스킵
+            continue
+
+    if not results:
+        st.info("타깃과의 관련도를 계산할 수 있는 변수가 없습니다.")
+        return
+
+    res_df = pd.DataFrame(results)
+    res_df = res_df.sort_values("절댓값", ascending=False)
+
+    st.markdown("#### 🎯 타깃과 변수들의 관련도 랭킹 (절댓값 기준 내림차순)")
     st.dataframe(
-        corr_sorted.to_frame("상관계수"),
+        res_df[["변수", "유형", "상관계수"]],
         use_container_width=True,
     )
 
-    # 상관계수 절댓값이 0.5 이상인 변수만 한 번 더 강조
-    strong_corr = corr_sorted[ corr_sorted.abs() >= 0.5 ]
-    if not strong_corr.empty:
-        st.markdown("##### ⭐ 상관계수 절댓값이 0.5 이상인 변수들 (강한 상관관계)")
-        st.write(strong_corr.to_frame("상관계수"))
-    else:
-        st.info("절댓값 0.5 이상으로 강한 상관관계를 보이는 수치형 변수는 없습니다.")
-
     st.caption(
-        "상관계수의 절댓값이 0.5 이상이면 비교적 강한 선형 관계가 있다고 볼 수 있습니다.\n"
-        "이 정보를 활용해 **타깃과 관련이 높아 보이는 특징 열을 선택해 볼 수 있습니다.**"
+        "- **상관계수**의 절댓값이 1에 가까울수록, 타깃과의 선형 관계가 강합니다.\n"
+        "- 수치형은 원래 값 그대로, 범주형은 원-핫 인코딩된 더미 변수 중\n"
+        "  타깃과 가장 관련이 큰 값을 대표 상관계수로 사용했습니다.\n"
+        "- 이 값은 **정확한 인과관계**를 의미하지 않고, 어디까지나 "
+        "타깃과의 **관련 정도를 빠르게 살펴보는 지표**로 활용하면 좋습니다."
     )
 
 
