@@ -400,33 +400,36 @@ def show_classification_results(y_test, y_pred):
     """분류 모델 평가 결과 출력"""
     st.subheader("4️⃣ 분류 모델 평가 결과 🔍")
 
-    # 라벨 정보
+    # --- 1) 라벨 및 리포트 계산 (여기 결과를 위/아래에서 공통 사용) ---
     labels = sorted(list(set(y_test) | set(y_pred)))
+    # classification_report를 dict로 받아와서 숫자를 안정적으로 사용
+    report = classification_report(
+        y_test, y_pred, output_dict=True, zero_division=0
+    )
 
-    # 🔹 정확도
-    acc = accuracy_score(y_test, y_pred)
+    # 정확도는 report["accuracy"]에 들어 있음
+    acc = report["accuracy"]
 
-    # 🔹 이진 분류(예: 0/1)일 때는 "양성 클래스" 기준으로 precision/recall/F1 계산
+    # 이진 분류면 "양성 클래스(보통 1)" 기준, 아니면 macro 평균 사용
     if len(labels) == 2:
-        # 보통 1이 양성 클래스지만, 데이터에 따라 없을 수도 있어서 처리
         pos_label = 1 if 1 in labels else labels[-1]
-        prec = precision_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
-        rec = recall_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
-        f1 = f1_score(y_test, y_pred, pos_label=pos_label, zero_division=0)
-        metric_subtitle = f"(양성 클래스: {pos_label})"
+        key = str(pos_label)
+        prec = report[key]["precision"]
+        rec = report[key]["recall"]
+        f1 = report[key]["f1-score"]
+        metric_note = f"(양성 클래스 {key} 기준)"
     else:
-        # 다중 분류일 때는 macro 평균으로 표시
-        prec = precision_score(y_test, y_pred, average="macro", zero_division=0)
-        rec = recall_score(y_test, y_pred, average="macro", zero_division=0)
-        f1 = f1_score(y_test, y_pred, average="macro", zero_division=0)
-        metric_subtitle = "(macro 평균)"
+        prec = report["macro avg"]["precision"]
+        rec = report["macro avg"]["recall"]
+        f1 = report["macro avg"]["f1-score"]
+        metric_note = "(모든 클래스를 동일 비중으로 본 macro 평균)"
 
-    # 🔹 한 줄에 Accuracy / Precision / Recall / F1 한 번에 보여주기
+    # --- 2) 위쪽에 큰 메트릭 4개 한눈에 보여주기 ---
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("정확도 (accuracy)", f"{acc:.3f}")
-    c2.metric(f"정밀도 (precision) {metric_subtitle}", f"{prec:.3f}")
-    c3.metric(f"재현율 (recall) {metric_subtitle}", f"{rec:.3f}")
-    c4.metric(f"F1-score {metric_subtitle}", f"{f1:.3f}")
+    c2.metric(f"정밀도 (precision) {metric_note}", f"{prec:.3f}")
+    c3.metric(f"재현율 (recall) {metric_note}", f"{rec:.3f}")
+    c4.metric(f"F1-score {metric_note}", f"{f1:.3f}")
 
     st.caption(
         "- **정확도(accuracy)**: 전체 예측 중에서 맞춘 비율\n"
@@ -435,8 +438,86 @@ def show_classification_results(y_test, y_pred):
         "- **F1-score**: 정밀도와 재현율의 조화평균 (둘 다 균형 있게 좋은지)"
     )
 
-    # 🔻 여기서부터는 기존 혼동행렬 / 분포 그래프 / classification_report 부분 이어서 사용
-    # 예: cm = confusion_matrix(...), fig_cm = px.imshow(...), ...
+    # --- 3) 혼동행렬 그림 (여기서부터는 그대로 아래로 쭉 나옴) ---
+    cm = confusion_matrix(y_test, y_pred)
+    label_strs = [str(l) for l in labels]
+
+    st.markdown("#### 🔢 혼동행렬 (Confusion Matrix)")
+    fig_cm = px.imshow(
+        cm,
+        x=label_strs,
+        y=label_strs,
+        text_auto=True,
+        color_continuous_scale="Blues",
+        aspect="equal",
+    )
+    fig_cm.update_layout(
+        xaxis_title="예측 값",
+        yaxis_title="실제 값",
+        xaxis=dict(type="category"),
+        yaxis=dict(type="category"),
+    )
+    st.plotly_chart(fig_cm, use_container_width=True)
+
+    # --- 4) 혼동행렬 & 분포 설명 텍스트 ---
+    st.markdown(
+        """
+**혼동행렬 & 분포 그래프 해석**
+
+- **혼동행렬**은 `정답(실제 값)`과 `예측`을 짝지어서 **얼마나 맞았는지/틀렸는지**를 보여줍니다.  
+- **실제 분포 vs 예측 분포 그래프**는 모델이 각 클래스를 **얼마나 자주 선택했는지**를 실제 데이터와 비교해서 보여줍니다.  
+
+두 정보를 함께 보면  
+- 단순히 **맞춘 비율(정확도)**뿐 아니라,  
+- **특정 답만 너무 많이 고르는 건 아닌지(편향)**도 함께 살펴볼 수 있습니다.
+        """
+    )
+
+    # --- 5) 실제 분포 vs 예측 분포 (비율 비교) ---
+    st.markdown("#### 📊 실제 분포 vs 예측 분포 (비율 비교)")
+
+    actual_counts = pd.Series(y_test).value_counts()
+    pred_counts = pd.Series(y_pred).value_counts()
+
+    all_labels = sorted(set(actual_counts.index) | set(pred_counts.index))
+    actual_counts = actual_counts.reindex(all_labels, fill_value=0)
+    pred_counts = pred_counts.reindex(all_labels, fill_value=0)
+
+    actual_ratio = actual_counts / actual_counts.sum()
+    pred_ratio = pred_counts / pred_counts.sum()
+
+    dist_df = pd.DataFrame({
+        "클래스": [str(l) for l in all_labels] * 2,
+        "비율": np.concatenate([actual_ratio.values, pred_ratio.values]),
+        "데이터": ["실제"] * len(all_labels) + ["예측"] * len(all_labels),
+    })
+
+    fig_compare = px.bar(
+        dist_df,
+        x="클래스",
+        y="비율",
+        color="데이터",
+        barmode="group",
+        text_auto=".2f",
+    )
+    fig_compare.update_layout(
+        yaxis=dict(range=[0, 1]),
+        yaxis_title="비율",
+    )
+    st.plotly_chart(fig_compare, use_container_width=True)
+
+    st.caption(
+        "막대그래프에서 **실제 분포**와 **예측 분포**의 모양이 비슷할수록, "
+        "모델이 각 클래스를 보다 균형 있게 예측하고 있다고 볼 수 있습니다."
+    )
+
+    # --- 6) 원래 보던 classification_report 텍스트 버전 (expander로) ---
+    with st.expander("클래스별 정밀도/재현율/F1-score 자세히 보기"):
+        st.text(classification_report(y_test, y_pred, zero_division=0))
+        st.caption(
+            "- 위 요약 메트릭은 이 리포트의 값과 동일하게 계산되었습니다.\n"
+            "- 특히 **소수 클래스(예: 1)**의 재현율과 정밀도를 잘 살펴보세요."
+        )
 
 
 def show_regression_results(y_test, y_pred):
