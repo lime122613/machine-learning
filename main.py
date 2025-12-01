@@ -36,7 +36,7 @@ import plotly.express as px
 # ---------------------------------------------
 st.set_page_config(
     page_title="지도학습 실습 앱",
-    page_icon="📘",
+    page_icon="🤖",
     layout="wide",
 )
 
@@ -717,7 +717,25 @@ def main():
         지도학습(supervised learning)의 전체 흐름을 직접 체험해볼 수 있도록 만든 교육용 도구입니다.
         """
     )
-
+    # 👇 여기 추가하세요
+    st.markdown(
+        """
+        <style>
+        .made-by-footer {
+            position: fixed;
+            bottom: 0.5rem;
+            right: 1rem;
+            color: #888888;
+            font-size: 0.8rem;
+            z-index: 9999;
+        }
+        </style>
+        <div class="made-by-footer">
+            MADE BY 정윤T 💙
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.info(
         "- **독립변수(입력/특징)**: 모델이 참고하는 정보 (예: 공부 시간, 나이, 키)\n"
         "- **종속변수(타깃/정답)**: 모델이 맞히고 싶은 값 (예: 시험 점수, 합격/불합격)\n"
@@ -836,17 +854,6 @@ def main():
         )
     else:
         st.info("사이드바에서 **🚀 모델 학습하기** 버튼을 누르면 결과가 여기에 표시됩니다.")
-    # -----------------------------------------
-    # 하단 제작자 표시
-    # -----------------------------------------
-    st.markdown("---")
-    st.markdown(
-        '<div style="text-align:right; color: #888888; font-size: 0.85rem;">'
-        'MADE BY 세화여고 정윤T'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
 
 if __name__ == "__main__":
     main()
