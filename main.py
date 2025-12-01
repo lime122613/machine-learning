@@ -836,6 +836,16 @@ def main():
         )
     else:
         st.info("사이드바에서 **🚀 모델 학습하기** 버튼을 누르면 결과가 여기에 표시됩니다.")
+    # -----------------------------------------
+    # 하단 제작자 표시
+    # -----------------------------------------
+    st.markdown("---")
+    st.markdown(
+        '<div style="text-align:right; color: #888888; font-size: 0.85rem;">'
+        'MADE BY 세화여고 정윤T'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
