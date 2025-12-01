@@ -710,6 +710,10 @@ def run_training_and_evaluation(
 # 메인 앱
 # ---------------------------------------------
 def main():
+    # 학습 완료 여부를 session_state에 저장 (처음에는 False)
+    if "trained" not in st.session_state:
+        st.session_state["trained"] = False
+
     st.title("🤖 지도학습 실습 웹 앱")
     st.write(
         """
@@ -763,11 +767,13 @@ def main():
         st.error("CSV 파일을 읽을 수 없거나, 데이터가 비어 있습니다. 다른 파일을 업로드해 주세요.")
         st.stop()
 
-    # 데이터 미리보기 및 요약
-    show_data_overview(df)
+    #    학습 후에는 숨겨서 평가 결과가 위쪽에 바로 보이도록 처리
+    if not st.session_state["trained"]:
+        # 1️⃣ 데이터 미리보기 및 요약
+        show_data_overview(df)
 
-    # 수치형 변수 간 상관관계 히트맵
-    show_correlation_heatmap(df)
+        # 2️⃣ 수치형 변수 간 상관관계 히트맵
+        show_correlation_heatmap(df)
 
     # -----------------------------------------
     # 2. 특징/타깃 선택
@@ -843,6 +849,12 @@ def main():
     # -----------------------------------------
     st.sidebar.subheader("6️⃣ 모델 학습 실행")
     if st.sidebar.button("🚀 모델 학습하기"):
+        st.session_state["trained"] = True
+
+    # -----------------------------------------
+    # 6. 모델 학습 및 평가 결과 표시
+    # -----------------------------------------
+    if st.session_state["trained"]:
         run_training_and_evaluation(
             df=df,
             feature_cols=feature_cols,
@@ -851,10 +863,18 @@ def main():
             algo=algo,
             params=params,
             test_size=test_size,
-            scaler_option=scaler_option,
         )
+
+        # (선택) 다시 1번/2번 보고 싶을 때를 위한 버튼
+        if st.button("🔄 데이터 미리보기/상관관계 다시 보기"):
+            st.session_state["trained"] = False
+            st.experimental_rerun()
     else:
-        st.info("사이드바에서 **🚀 모델 학습하기** 버튼을 누르면 결과가 여기에 표시됩니다.")
+        st.info(
+            "사이드바에서 **🚀 모델 학습하기** 버튼을 누르면, "
+            "아래에 모델 학습 및 평가 결과가 표시됩니다."
+        )
+
 
 if __name__ == "__main__":
     main()
