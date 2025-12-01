@@ -863,6 +863,7 @@ def main():
             algo=algo,
             params=params,
             test_size=test_size,
+            scaler_option=scaler_option,
         )
 
         # (선택) 다시 1번/2번 보고 싶을 때를 위한 버튼
