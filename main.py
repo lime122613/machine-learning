@@ -26,6 +26,7 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 import plotly.express as px
 
@@ -343,6 +344,28 @@ def select_algorithm(problem_type: str):
 
     return algo, params
 
+def scale_features(X_train, X_test, scaler_option: str):
+    """
+    선택한 옵션에 따라 입력(특징) 변수에 정규화/스케일링을 적용합니다.
+    - '안 함'         : 그대로 사용
+    - '표준화(StandardScaler)' : 평균 0, 표준편차 1이 되도록 변환
+    - 'Min-Max 스케일링'       : 0~1 범위로 변환
+    """
+    if scaler_option == "안 함":
+        return X_train, X_test  # 아무 것도 안 하고 그대로 반환
+
+    if scaler_option == "표준화(StandardScaler)":
+        scaler = StandardScaler()
+    elif scaler_option == "Min-Max 스케일링":
+        scaler = MinMaxScaler()
+    else:
+        # 혹시 모를 예외 (기본은 아무 것도 안 함)
+        return X_train, X_test
+
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    return X_train_scaled, X_test_scaled
 
 def build_model(problem_type: str, algo: str, params: dict):
     """선택된 알고리즘과 하이퍼파라미터로 모델 객체 생성"""
@@ -588,7 +611,7 @@ def show_regression_results(y_test, y_pred):
 
 
 def run_training_and_evaluation(
-    df, feature_cols, target_col, problem_type, algo, params, test_size
+    df, feature_cols, target_col, problem_type, algo, params, test_size, scaler_option
 ):
     """전체 학습/평가 파이프라인 실행"""
     st.subheader("4️⃣ 학습 및 데이터 분할")
@@ -655,8 +678,18 @@ def run_training_and_evaluation(
         X_encoded, y, test_size=test_size, random_state=42
     )
 
+    # 🔹 선택한 옵션에 따라 정규화/스케일링 적용
+    X_train, X_test = scale_features(X_train, X_test, scaler_option)
+
     st.write(f"- 학습(train) 데이터 행 개수: **{X_train.shape[0]}**")
     st.write(f"- 테스트(test) 데이터 행 개수: **{X_test.shape[0]}**")
+
+    if scaler_option != "안 함":
+        st.info(
+            f"입력(특징) 변수에 **{scaler_option}**을 적용해 "
+            "특징들의 크기(스케일)를 맞춘 뒤 모델을 학습했습니다.\n"
+            "특히 **K-최근접 이웃(KNN), 로지스틱 회귀**처럼 거리/크기에 민감한 알고리즘에서 도움이 됩니다."
+        )
 
     model = build_model(problem_type, algo, params)
 
@@ -774,10 +807,22 @@ def main():
         "테스트 데이터는 모델의 성능을 평가하기 위해 따로 떼어놓는 데이터입니다."
     )
 
+    # 정규화/스케일링 선택
+    st.sidebar.subheader("5️⃣ 정규화 / 스케일링 설정")
+    scaler_option = st.sidebar.radio(
+        "입력(특징) 변수 정규화 방법 선택",
+        ["안 함", "표준화(StandardScaler)", "Min-Max 스케일링"],
+        index=0,
+        help=(
+            "모델에 넣기 전에 입력 변수들의 크기를 비슷한 범위로 맞춰줍니다.\n"
+            "KNN, 로지스틱 회귀처럼 거리/크기에 민감한 알고리즘에서 특히 중요합니다."
+        ),
+    )
+
     # -----------------------------------------
     # 5. 모델 학습 버튼
     # -----------------------------------------
-    st.sidebar.subheader("5️⃣ 모델 학습 실행")
+    st.sidebar.subheader("6️⃣ 모델 학습 실행")
     if st.sidebar.button("🚀 모델 학습하기"):
         run_training_and_evaluation(
             df=df,
@@ -787,6 +832,7 @@ def main():
             algo=algo,
             params=params,
             test_size=test_size,
+            scaler_option=scaler_option,
         )
     else:
         st.info("사이드바에서 **🚀 모델 학습하기** 버튼을 누르면 결과가 여기에 표시됩니다.")
